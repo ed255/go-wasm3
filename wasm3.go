@@ -5,6 +5,14 @@ package wasm3
 #cgo darwin LDFLAGS: -L${SRCDIR}/lib/darwin -lm3
 #cgo linux CFLAGS: -Iinclude
 #cgo linux LDFLAGS: -L${SRCDIR}/lib/linux -lm3 -lm
+#cgo android arm CFLAGS: -Iinclude
+#cgo android arm LDFLAGS: -L${SRCDIR}/lib/android/armeabi-v7a -lm3 -lm
+#cgo android arm64 CFLAGS: -Iinclude
+#cgo android arm64 LDFLAGS: -L${SRCDIR}/lib/android/arm64-v8a -lm3 -lm
+#cgo android 386 CFLAGS: -Iinclude
+#cgo android 386 LDFLAGS: -L${SRCDIR}/lib/android/x86 -lm3 -lm
+#cgo android amd64 CFLAGS: -Iinclude
+#cgo android amd64 LDFLAGS: -L${SRCDIR}/lib/android/x86_64 -lm3 -lm
 
 #include "m3.h"
 #include "m3_api_libc.h"
@@ -56,34 +64,38 @@ u8* get_allocated_memory(IM3Runtime i_runtime) {
 */
 import "C"
 
-import(
-	"unsafe"
+import (
 	"errors"
 	"reflect"
+	"unsafe"
 )
 
 // RuntimeT is an alias for IM3Runtime
 type RuntimeT C.IM3Runtime
+
 // EnvironmentT is an alias for IM3Environment
 type EnvironmentT C.IM3Environment
+
 // ModuleT is an alias for IM3Module
 type ModuleT C.IM3Module
+
 // FunctionT is an alias for IM3Function
 type FunctionT C.IM3Function
+
 // ResultT is an alias for M3Result
 type ResultT C.M3Result
 
-var(
-	errParseModule = errors.New("Parse error")
-	errLoadModule = errors.New("Load error")
+var (
+	errParseModule      = errors.New("Parse error")
+	errLoadModule       = errors.New("Load error")
 	errFuncLookupFailed = errors.New("Function lookup failed")
 )
 
 // Config holds the runtime and environment configuration
 type Config struct {
 	Environment *Environment
-	StackSize uint
-	EnableWASI bool
+	StackSize   uint
+	EnableWASI  bool
 }
 
 // Runtime wraps a WASM3 runtime
@@ -93,13 +105,13 @@ type Runtime struct {
 }
 
 // Ptr returns a IM3Runtime pointer
-func(r *Runtime) Ptr() C.IM3Runtime {
+func (r *Runtime) Ptr() C.IM3Runtime {
 	return (C.IM3Runtime)(r.ptr)
 }
 
 // Load wraps the parse and load module calls.
 // This will be replaced by env.ParseModule and Runtime.LoadModule.
-func(r *Runtime) Load(wasmBytes []byte) (*Module, error) {
+func (r *Runtime) Load(wasmBytes []byte) (*Module, error) {
 	result := C.m3Err_none
 	bytes := C.CBytes(wasmBytes)
 	length := len(wasmBytes)
@@ -132,7 +144,7 @@ func(r *Runtime) Load(wasmBytes []byte) (*Module, error) {
 }
 
 // LoadModule wraps m3_LoadModule and returns a module object
-func(r *Runtime) LoadModule(module *Module) (*Module, error) {
+func (r *Runtime) LoadModule(module *Module) (*Module, error) {
 	result := C.m3Err_none
 	result = C.m3_LoadModule(
 		r.Ptr(),
@@ -152,7 +164,7 @@ func(r *Runtime) LoadModule(module *Module) (*Module, error) {
 }
 
 // FindFunction calls m3_FindFunction and returns a call function
-func(r *Runtime) FindFunction(funcName string) (FunctionWrapper, error) {
+func (r *Runtime) FindFunction(funcName string) (FunctionWrapper, error) {
 	result := C.m3Err_none
 	var f C.IM3Function
 	cFuncName := C.CString(funcName)
@@ -174,14 +186,14 @@ func(r *Runtime) FindFunction(funcName string) (FunctionWrapper, error) {
 }
 
 // Destroy free calls m3_FreeRuntime
-func(r *Runtime) Destroy() {
-	C.m3_FreeRuntime(r.Ptr());
+func (r *Runtime) Destroy() {
+	C.m3_FreeRuntime(r.Ptr())
 	r.cfg.Environment.Destroy()
 }
 
 // Memory allows access to runtime Memory.
 // Taken from Wasmer extension: https://github.com/wasmerio/go-ext-wasm
-func(r *Runtime) Memory() []byte {
+func (r *Runtime) Memory() []byte {
 	mem := C.get_allocated_memory(
 		r.Ptr(),
 	)
@@ -196,13 +208,13 @@ func(r *Runtime) Memory() []byte {
 }
 
 // GetAllocatedMemoryLength returns the amount of allocated runtime memory
-func(r *Runtime) GetAllocatedMemoryLength() int {
+func (r *Runtime) GetAllocatedMemoryLength() int {
 	length := C.get_allocated_memory_length(r.Ptr())
 	return int(length)
 }
 
 // ParseModule is a helper that calls the same function in env.
-func(r *Runtime) ParseModule(wasmBytes []byte) (*Module, error) {
+func (r *Runtime) ParseModule(wasmBytes []byte) (*Module, error) {
 	return r.cfg.Environment.ParseModule(wasmBytes)
 }
 
@@ -223,40 +235,40 @@ func NewRuntime(cfg *Config) *Runtime {
 
 // Module wraps a WASM3 module.
 type Module struct {
-	ptr ModuleT
+	ptr          ModuleT
 	numFunctions int
 }
 
 // Ptr returns a pointer to IM3Module
-func(m *Module) Ptr() C.IM3Module {
+func (m *Module) Ptr() C.IM3Module {
 	return (C.IM3Module)(m.ptr)
 }
 
 // GetFunction provides access to IM3Function->functions
-func(m *Module) GetFunction(index uint) (*Function, error) {
+func (m *Module) GetFunction(index uint) (*Function, error) {
 	if uint(m.NumFunctions()) <= index {
 		return nil, errFuncLookupFailed
 	}
 	ptr := C.module_get_function(m.Ptr(), C.int(index))
 	name := C.GoString(ptr.name)
 	return &Function{
-		ptr: (FunctionT)(ptr),
+		ptr:  (FunctionT)(ptr),
 		Name: name,
 	}, nil
 }
 
 // GetFunctionByName is a helper to lookup functions by name
 // TODO: could be optimized by caching function names and pointer on the Go side, right after the load call.
-func(m *Module) GetFunctionByName(lookupName string) (*Function, error) {
+func (m *Module) GetFunctionByName(lookupName string) (*Function, error) {
 	var fn *Function
-	for i :=0 ; i < m.NumFunctions(); i++ {
+	for i := 0; i < m.NumFunctions(); i++ {
 		ptr := C.module_get_function(m.Ptr(), C.int(i))
 		name := C.GoString(ptr.name)
 		if name != lookupName {
-			continue	
+			continue
 		}
 		fn = &Function{
-			ptr: (FunctionT)(ptr),
+			ptr:  (FunctionT)(ptr),
 			Name: name,
 		}
 		return fn, nil
@@ -265,7 +277,7 @@ func(m *Module) GetFunctionByName(lookupName string) (*Function, error) {
 }
 
 // NumFunctions provides access to numFunctions.
-func(m *Module) NumFunctions() int {
+func (m *Module) NumFunctions() int {
 	// In case the number of functions hasn't been resolved yet, retrieve the int and keep it in the structure
 	if m.numFunctions == -1 {
 		m.numFunctions = int(m.Ptr().numFunctions)
@@ -276,7 +288,7 @@ func(m *Module) NumFunctions() int {
 // NewModule wraps a WASM3 moduke
 func NewModule(ptr ModuleT) *Module {
 	return &Module{
-		ptr: ptr,
+		ptr:          ptr,
 		numFunctions: -1,
 	}
 }
@@ -293,12 +305,12 @@ type Function struct {
 type FunctionWrapper func(args ...interface{}) (int, error)
 
 // Ptr returns a pointer to IM3Function
-func(f *Function) Ptr() C.IM3Function {
+func (f *Function) Ptr() C.IM3Function {
 	return (C.IM3Function)(f.ptr)
 }
 
 // CallWithArgs wraps m3_CallWithArgs
-func(f *Function) CallWithArgs(args... string) {
+func (f *Function) CallWithArgs(args ...string) {
 	length := len(args)
 	cArgs := make([]*C.char, length)
 	for i, v := range args {
@@ -310,7 +322,7 @@ func(f *Function) CallWithArgs(args... string) {
 
 // Call implements a better call function
 // TODO: support diferent types
-func(f *Function) Call(args... interface{}) (int, error) {
+func (f *Function) Call(args ...interface{}) (int, error) {
 	length := len(args)
 	if length == 0 {
 		result := C.call(f.Ptr(), 0, nil)
@@ -338,7 +350,7 @@ type Environment struct {
 }
 
 // ParseModule wraps m3_ParseModule
-func(e *Environment) ParseModule(wasmBytes []byte) (*Module, error) {
+func (e *Environment) ParseModule(wasmBytes []byte) (*Module, error) {
 	result := C.m3Err_none
 	bytes := C.CBytes(wasmBytes)
 	length := len(wasmBytes)
@@ -354,13 +366,14 @@ func(e *Environment) ParseModule(wasmBytes []byte) (*Module, error) {
 	}
 	return NewModule((ModuleT)(module)), nil
 }
+
 // Ptr returns a pointer to IM3Environment
-func(e *Environment) Ptr() C.IM3Environment {
+func (e *Environment) Ptr() C.IM3Environment {
 	return (C.IM3Environment)(e.ptr)
 }
 
 // Destroy calls m3_FreeEnvironment
-func(e *Environment) Destroy() {
+func (e *Environment) Destroy() {
 	C.m3_FreeEnvironment(e.Ptr())
 }
 
