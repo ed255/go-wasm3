@@ -10,10 +10,14 @@
 
 #include "m3_core.h"
 
-d_m3BeginExternC
+# if defined(__cplusplus)
+extern "C" {
+# endif
 
-M3Result    m3_LinkWASI     (IM3Module io_module);
+    M3Result    m3_LinkWASI     (IM3Module io_module);
 
-d_m3EndExternC
+#if defined(__cplusplus)
+}
+# endif
 
 #endif // m3_api_wasi_h

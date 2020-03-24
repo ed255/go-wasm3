@@ -8,27 +8,23 @@
 #ifndef m3_env_h
 #define m3_env_h
 
-#include "wasm3.h"
+#include "m3.h"
 #include "m3_code.h"
 #include "m3_exec.h"
 #include "m3_compile.h"
 
-d_m3BeginExternC
 
 typedef struct M3FuncType
 {
-    struct M3FuncType *     next;
-
     u32                     numArgs;
+    u8                      argTypes                [d_m3MaxNumFunctionArgs];
     u8                      returnType;
-    u8                      argTypes        [3];    // M3FuncType is a dynamically sized object; these are padding
 }
 M3FuncType;
 
 typedef M3FuncType *        IM3FuncType;
 
-M3Result    AllocFuncType                   (IM3FuncType * o_functionType, u32 i_numArgs);
-bool        AreFuncTypesEqual               (const IM3FuncType i_typeA, const IM3FuncType i_typeB);
+void        PrintFuncTypeSignature          (IM3FuncType i_funcType);
 
 
 //---------------------------------------------------------------------------------------------------------------------------------
@@ -45,33 +41,24 @@ typedef struct M3Function
 
     IM3FuncType             funcType;
 
+    IM3Operation            callOp;
     pc_t                    compiled;
-
-#   if (d_m3EnableCodePageRefCounting)
-    IM3CodePage *           codePageRefs;           // array of all pages used
-    u32                     numCodePageRefs;
-#   endif
 
     u32                     hits;
 
     u16                     maxStackSlots;
 
-    u16                     numArgSlots;
-
     u16                     numLocals;          // not including args
-    u16                     numLocalBytes;
 
+    u16                     numConstants;
     void *                  constants;
-    u16                     numConstantBytes;
 
-    bool                    ownsWasmCode;
+//    bool                    callNeedsRuntime;
 }
 M3Function;
 
 typedef M3Function *        IM3Function;
 
-void        Function_Release            (IM3Function i_function);
-void        Function_FreeCompiledCode   (IM3Function i_function);
 
 cstr_t      GetFunctionImportModuleName (IM3Function i_function);
 cstr_t      GetFunctionName             (IM3Function i_function);
@@ -146,15 +133,14 @@ typedef M3Global *          IM3Global;
 
 
 //---------------------------------------------------------------------------------------------------------------------------------
-typedef struct M3Module
+typedef struct M3Module                 // TODO add env owner? also discriminates stack/heap
 {
     struct M3Runtime *      runtime;
-    struct M3Environment *  environment;
 
     cstr_t                  name;
 
     u32                     numFuncTypes;
-    IM3FuncType *           funcTypes;          // array of pointers to list of FuncTypes
+    M3FuncType *            funcTypes;
 
     u32                     numImports;
     IM3Function *           imports;            // notice: "I" prefix. imports are pointers to functions in another module.
@@ -181,7 +167,7 @@ typedef struct M3Module
     M3MemoryInfo            memoryInfo;
     bool                    memoryImported;
 
-    bool                    hasWasmCodeCopy;
+//  m3reg_t *               globalMemory;
 
     struct M3Module *       next;
 }
@@ -196,25 +182,16 @@ M3Result                    Module_AddFunction          (IM3Module io_module, u3
 IM3Function                 Module_GetFunction          (IM3Module i_module, u32 i_functionIndex);
 
 //---------------------------------------------------------------------------------------------------------------------------------
-
-static const u32 c_m3NumTypesPerPage = 8;
-
-//---------------------------------------------------------------------------------------------------------------------------------
-
 typedef struct M3Environment
 {
-//    struct M3Runtime *      runtimes;
+    u32     dummy;
+//    u32                     numCodePages;
+//    u32                     numActiveCodePages;
 
-    IM3FuncType             funcTypes;          // linked list
-
-    M3CodePage *            pagesReleased;
+    //  u32                     numFuncTypes;
+    //  M3FuncType *            funcTypes;
 }
 M3Environment;
-
-void                        Environment_Release         (IM3Environment i_environment);
-
-// takes ownership of io_funcType and returns a pointer to the persistent version (could be same or different)
-void                        Environment_AddFuncType     (IM3Environment i_environment, IM3FuncType * io_funcType);
 
 typedef M3Environment *     IM3Environment;
 
@@ -246,13 +223,11 @@ typedef struct M3Runtime
     M3Result                runtimeError;
 
     M3Memory                memory;
-    u32                     memoryLimit;
 
     M3ErrorInfo             error;
 #if defined(d_m3VerboseLogs)
     char                    error_message[256];
 #endif
-    i32                     exit_code;
 }
 M3Runtime;
 
@@ -260,7 +235,7 @@ typedef M3Runtime *         IM3Runtime;
 
 
 void                        InitRuntime                 (IM3Runtime io_runtime, u32 i_stackSizeInBytes);
-void                        Runtime_Release             (IM3Runtime io_runtime);
+void                        ReleaseRuntime              (IM3Runtime io_runtime);
 
 M3Result                    ResizeMemory                (IM3Runtime io_runtime, u32 i_numPages);
 
@@ -270,11 +245,10 @@ void *                      ForEachModule               (IM3Runtime i_runtime, M
 void *                      v_FindFunction              (IM3Module i_module, const char * const i_name);
 
 IM3CodePage                 AcquireCodePage             (IM3Runtime io_runtime);
-IM3CodePage                 AcquireCodePageWithCapacity (IM3Runtime io_runtime, u32 i_lineCount);
+IM3CodePage                 AcquireCodePageWithCapacity (IM3Runtime io_runtime, u32 i_slotCount);
 void                        ReleaseCodePage             (IM3Runtime io_runtime, IM3CodePage i_codePage);
 
 M3Result                    m3Error                     (M3Result i_result, IM3Runtime i_runtime, IM3Module i_module, IM3Function i_function, const char * const i_file, u32 i_lineNum, const char * const i_errorMessage, ...);
 
-d_m3EndExternC
 
 #endif // m3_env_h

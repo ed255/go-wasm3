@@ -1,20 +1,15 @@
 package wasm3
 
 /*
-#cgo darwin CFLAGS: -Iinclude
+#cgo CFLAGS: -Iinclude
 #cgo darwin LDFLAGS: -L${SRCDIR}/lib/darwin -lm3
-#cgo linux CFLAGS: -Iinclude
-#cgo linux LDFLAGS: -L${SRCDIR}/lib/linux -lm3 -lm
-#cgo android arm CFLAGS: -Iinclude
-#cgo android arm LDFLAGS: -L${SRCDIR}/lib/android/armeabi-v7a -lm3 -lm
-#cgo android arm64 CFLAGS: -Iinclude
-#cgo android arm64 LDFLAGS: -L${SRCDIR}/lib/android/arm64-v8a -lm3 -lm
-#cgo android 386 CFLAGS: -Iinclude
-#cgo android 386 LDFLAGS: -L${SRCDIR}/lib/android/x86 -lm3 -lm
-#cgo android amd64 CFLAGS: -Iinclude
-#cgo android amd64 LDFLAGS: -L${SRCDIR}/lib/android/x86_64 -lm3 -lm
+#cgo !android,linux,amd64 LDFLAGS: -L${SRCDIR}/lib/linux/x86_64 -lm3 -lm
+#cgo android,arm LDFLAGS: -L${SRCDIR}/lib/android/armeabi-v7a -lm3 -lm
+#cgo android,arm64 LDFLAGS: -L${SRCDIR}/lib/android/arm64-v8a -lm3 -lm
+#cgo android,386 LDFLAGS: -L${SRCDIR}/lib/android/x86 -lm3 -lm
+#cgo android,amd64 LDFLAGS: -L${SRCDIR}/lib/android/x86_64 -lm3 -lm
 
-#include "m3.h"
+#include "wasm3.h"
 #include "m3_api_libc.h"
 #include "m3_api_wasi.h"
 #include "m3_env.h"
@@ -95,7 +90,7 @@ var (
 type Config struct {
 	Environment *Environment
 	StackSize   uint
-	EnableWASI  bool
+	// EnableWASI  bool
 }
 
 // Runtime wraps a WASM3 runtime
@@ -136,9 +131,9 @@ func (r *Runtime) Load(wasmBytes []byte) (*Module, error) {
 	if result != nil {
 		return nil, errors.New("LinkSpecTest failed")
 	}
-	if r.cfg.EnableWASI {
-		C.m3_LinkWASI(r.Ptr().modules)
-	}
+	// if r.cfg.EnableWASI {
+	// 	C.m3_LinkWASI(r.Ptr().modules)
+	// }
 	m := NewModule((ModuleT)(module))
 	return m, nil
 }
@@ -157,9 +152,9 @@ func (r *Runtime) LoadModule(module *Module) (*Module, error) {
 	if result != nil {
 		return nil, errors.New("LinkSpecTest failed")
 	}
-	if r.cfg.EnableWASI {
-		C.m3_LinkWASI(r.Ptr().modules)
-	}
+	// if r.cfg.EnableWASI {
+	// 	C.m3_LinkWASI(r.Ptr().modules)
+	// }
 	return module, nil
 }
 

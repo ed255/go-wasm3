@@ -76,8 +76,6 @@
 #   define M3_ARCH "mips"
 #  elif defined(__xtensa__)
 #   define M3_ARCH "xtensa"
-#  elif defined(__arc__)
-#   define M3_ARCH "arc32"
 #  elif defined(__riscv)
 #   if defined(__riscv_32e)
 #    define _M3_ARCH_RV "rv32e"
@@ -119,7 +117,7 @@
 #  endif
 # endif
 
-# if defined(M3_COMPILER_MSVC)
+#if defined(M3_COMPILER_MSVC)
 #  if defined(_M_X64)
 #   define M3_ARCH "x64"
 #  elif defined(_M_IX86)
@@ -137,11 +135,7 @@
 # endif
 
 # if defined(M3_COMPILER_CLANG)
-#  if defined(WIN32)
-#   define M3_COMPILER_VER __VERSION__ " for Windows"
-#  else
-#   define M3_COMPILER_VER __VERSION__
-#  endif
+#  define M3_COMPILER_VER __VERSION__
 # elif defined(M3_COMPILER_GCC)
 #  define M3_COMPILER_VER "GCC " __VERSION__
 # elif defined(M3_COMPILER_MSVC)
@@ -182,11 +176,11 @@
 #  define M3_WEAK __attribute__((weak))
 # endif
 
-# ifndef m3_min
-#  define m3_min(A,B) (((A) < (B)) ? (A) : (B))
+# ifndef min
+#  define min(A,B) (((A) < (B)) ? (A) : (B))
 # endif
-# ifndef m3_max
-#  define m3_max(A,B) (((A) > (B)) ? (A) : (B))
+# ifndef max
+#  define max(A,B) (((A) > (B)) ? (A) : (B))
 # endif
 
 #define M3_INIT(field) memset(&field, 0, sizeof(field))
@@ -217,51 +211,23 @@ typedef int8_t          i8;
  */
 
 # if defined (M3_COMPILER_MSVC)
-#   define vectorcall   // For MSVC, better not to specify any call convention
+#   define  vectorcall
 # elif defined(WIN32)
-#   define vectorcall   __vectorcall
+#   define  vectorcall __vectorcall
 # elif defined (ESP8266)
 #   include <c_types.h>
-#   define op_section   //ICACHE_FLASH_ATTR
+#   define vectorcall //ICACHE_FLASH_ATTR
 # elif defined (ESP32)
-#   if defined(M3_IN_IRAM)  // the interpreter is in IRAM, attribute not needed
-#     define op_section
-#   else
-#     include "esp_system.h"
-#     define op_section   IRAM_ATTR
-#   endif
+#   include "esp_system.h"
+#   define vectorcall IRAM_ATTR
 # elif defined (FOMU)
-#   define op_section   __attribute__((section(".ramtext")))
+#   define vectorcall __attribute__((section(".ramtext")))
+# elif defined(HIFIVE1)
+#   define vectorcall
+# else
+#   define vectorcall
 # endif
 
-#ifndef vectorcall
-#define vectorcall
-#endif
-
-#ifndef op_section
-#define op_section
-#endif
-
-
-/*
- * Device-specific defaults
- */
-
-# ifndef d_m3MaxFunctionStackHeight
-#  if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_AMEBA) || defined(TEENSYDUINO)
-#    define d_m3MaxFunctionStackHeight          128
-#  endif
-# endif
-
-# ifndef d_m3FixedHeap
-#  if defined(ARDUINO_AMEBA)
-#    define d_m3FixedHeap                       (128*1024)
-#  elif defined(BLUE_PILL) || defined(FOMU)
-#    define d_m3FixedHeap                       (12*1024)
-#  elif defined(ARDUINO_ARCH_ARC32) // Arduino 101
-#    define d_m3FixedHeap                       (10*1024)
-#  endif
-# endif
 
 /*
  * Platform-specific defaults
@@ -278,8 +244,11 @@ typedef int8_t          i8;
 #  ifndef d_m3MaxFunctionStackHeight
 #    define d_m3MaxFunctionStackHeight          64
 #  endif
-#  ifndef d_m3CodePageAlignSize
-#    define d_m3CodePageAlignSize               1024
+# endif
+
+# if defined(ESP8266) || defined(BLUE_PILL) || defined(FOMU)
+#  ifndef d_m3FixedHeap
+#    define d_m3FixedHeap                       (8*1024)
 #  endif
 # endif
 
