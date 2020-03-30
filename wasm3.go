@@ -132,6 +132,9 @@ func (r *Runtime) Load(wasmBytes []byte) (*Module, error) {
 	if result != nil {
 		return nil, errParseModule
 	}
+	if module.memoryImported {
+		module.memoryImported = false
+	}
 	result = C.m3_LoadModule(
 		r.Ptr(),
 		module,
@@ -171,12 +174,16 @@ var lock = sync.Mutex{}
 
 // LoadModule wraps m3_LoadModule and returns a module object
 func (r *Runtime) LoadModule(module *Module) (*Module, error) {
+	if module.Ptr().memoryImported {
+		module.Ptr().memoryImported = false
+	}
 	result := C.m3Err_none
 	result = C.m3_LoadModule(
 		r.Ptr(),
 		module.Ptr(),
 	)
 	if result != nil {
+		println(">>>", C.GoString(result))
 		return nil, errLoadModule
 	}
 	if r.cfg.EnableSpecTest {
@@ -270,7 +277,7 @@ func (r *Runtime) GetAllocatedMemoryLength() int {
 func (r *Runtime) ResizeMemory(numPages int32) error {
 	err := C.ResizeMemory(r.Ptr(), C.u32(numPages))
 	if err != C.m3Err_none {
-		return errors.New(LastErrorString())
+		return errors.New(C.GoString(err))
 	}
 	return nil
 }
