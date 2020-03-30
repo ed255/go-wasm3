@@ -10,8 +10,8 @@
 
 #define M3_VERSION_MAJOR 0
 #define M3_VERSION_MINOR 4
-#define M3_VERSION_REV   6
-#define M3_VERSION       "0.4.6"
+#define M3_VERSION_REV   5
+#define M3_VERSION       "0.4.5"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -208,10 +208,18 @@ d_m3ErrorConst  (trapStackOverflow,             "[trap] stack overflow")
                                                      const char * const     i_signature,
                                                      M3RawCall              i_function);
 
+    typedef const void * (* M3RawCallEx) (IM3Runtime runtime, uint64_t * _sp, void * _mem, uint64_t cookie);
+
+    M3Result            m3_LinkRawFunctionEx        (IM3Module              io_module,
+                                                     const char * const     i_moduleName,
+                                                     const char * const     i_functionName,
+                                                     const char * const     i_signature,
+                                                     M3RawCallEx            i_function,
+                                                     uint64_t               i_cookie);
+
 //-------------------------------------------------------------------------------------------------------------------------------
 //  functions
 //-------------------------------------------------------------------------------------------------------------------------------
-    M3Result            m3_Yield                    (void);
 
     M3Result            m3_FindFunction             (IM3Function *          o_function,
                                                      IM3Runtime             i_runtime,
