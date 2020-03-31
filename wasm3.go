@@ -31,6 +31,7 @@ void* m3ApiOffsetToPtr(void* offset, void* _mem);
 const char* function_get_import_module(IM3Function i_function);
 const char* function_get_import_field(IM3Function i_function);
 int findFunction(IM3Function * o_function, IM3Runtime i_runtime, const char * const i_moduleName, const char * const i_functionName);
+void get_function(IM3Function * o_function, IM3Module i_module, int i);
 u8 function_get_arg_type(IM3Function i_function, int index);
 
 typedef struct wasi_iovec_t
@@ -210,6 +211,7 @@ func (r *Runtime) FindFunction(funcName string) (FunctionWrapper, error) {
 		cFuncName,
 	)
 	if result != nil {
+		println(">>>", C.GoString(result))
 		return nil, errFuncLookupFailed
 	}
 	fn := &Function{
@@ -388,12 +390,37 @@ func (m *Module) NumFunctions() int {
 	return m.numFunctions
 }
 
+func (m *Module) FunctionNames() []string {
+	functions := make([]string, 0)
+	for i := 0; i < int(m.Ptr().numFunctions); i++ {
+		f := C.module_get_function(m.Ptr(), C.int(i))
+		functions = append(functions, C.GoString(f.name))
+		fmt.Printf("fun: '%v' module: %p\n", C.GoString(f.name), f.module)
+	}
+	return functions
+}
+
 // NumImports provides access to numImports
 func (m *Module) NumImports() int {
 	if m.numImports == -1 {
 		m.numImports = int(m.Ptr().numImports)
 	}
 	return m.numImports
+}
+
+// TODO: Store the CStrings to later free them!
+func (m *Module) LinkRawFunction(moduleName, functionName, signature string, fn unsafe.Pointer) error {
+	_moduleName := C.CString(moduleName)
+	// defer C.free(unsafe.Pointer(_moduleName))
+	_functionName := C.CString(functionName)
+	// defer C.free(unsafe.Pointer(_functionName))
+	_signature := C.CString(signature)
+	// defer C.free(unsafe.Pointer(_signature))
+	result := C.m3_LinkRawFunction(m.Ptr(), _moduleName, _functionName, _signature, (*[0]byte)(fn))
+	if result != nil {
+		return fmt.Errorf(C.GoString(result))
+	}
+	return nil
 }
 
 // GetModule retreive the function's module
@@ -522,6 +549,8 @@ func (f *Function) Call(args ...interface{}) (interface{}, error) {
 		return *(*float32)(unsafe.Pointer(&result[0])), nil
 	case C.c_m3Type_f64:
 		return *(*float64)(unsafe.Pointer(&result[0])), nil
+	case C.c_m3Type_none:
+		return 0, nil
 	default:
 		return 0, errors.New("unexpected return type (go)")
 	}

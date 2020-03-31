@@ -112,6 +112,8 @@ int call(IM3Function i_function, uint32_t i_argc, void * i_argv, void * o_result
 		case c_m3Type_f64:
 			*(f64*)o_result = (f64)(stack[0]);
 			break;
+		case c_m3Type_none:
+			break;
 		default:
 			set_error("unexpected return type");
 			return -1;
