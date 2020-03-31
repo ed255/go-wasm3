@@ -65,9 +65,9 @@ m3ApiRawFunction(m3_wasm3_raw_log)
 import "C"
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 
 	wasm3 "github.com/matiasinsaurralde/go-wasm3"
 )
@@ -75,6 +75,34 @@ import (
 const (
 	wasmFilename = "mycircuit.wasm"
 )
+
+func LinkImports(m *wasm3.Module) error {
+	err := m.LinkRawFunction("runtime", "error", "v(iiiiii)", C.m3_wasm3_raw_error)
+	if err != nil {
+		return err
+	}
+	err = m.LinkRawFunction("runtime", "logSetSignal", "v(ii)", C.m3_wasm3_raw_logSetSignal)
+	if err != nil {
+		return err
+	}
+	err = m.LinkRawFunction("runtime", "logGetSignal", "v(ii)", C.m3_wasm3_raw_logGetSignal)
+	if err != nil {
+		return err
+	}
+	err = m.LinkRawFunction("runtime", "logFinishComponent", "v(i)", C.m3_wasm3_raw_logFinishComponent)
+	if err != nil {
+		return err
+	}
+	err = m.LinkRawFunction("runtime", "logStartComponent", "v(i)", C.m3_wasm3_raw_logStartComponent)
+	if err != nil {
+		return err
+	}
+	err = m.LinkRawFunction("runtime", "log", "v(i)", C.m3_wasm3_raw_log)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 type WitnessCalcFns struct {
 	getFrLen          func() (int32, error)
@@ -87,7 +115,10 @@ type WitnessCalcFns struct {
 	getWitnessBuffer  func() (int32, error)
 }
 
-func NewWitnessCalcFns(r *wasm3.Runtime) (*WitnessCalcFns, error) {
+func NewWitnessCalcFns(r *wasm3.Runtime, m *wasm3.Module) (*WitnessCalcFns, error) {
+	if err := LinkImports(m); err != nil {
+		return nil, err
+	}
 	_getFrLen, err := r.FindFunction("getFrLen")
 	if err != nil {
 		return nil, err
@@ -143,7 +174,6 @@ func NewWitnessCalcFns(r *wasm3.Runtime) (*WitnessCalcFns, error) {
 		}
 		return nil
 	}
-	// _setSignal, err := r.FindFunctionByModule(".unnamed", "setSignal")
 	_setSignal, err := r.FindFunction("setSignal")
 	if err != nil {
 		println("B")
@@ -222,55 +252,47 @@ func main() {
 	}
 	log.Print("Loaded module")
 
-	fmt.Printf("NumImports: %v\n", module.NumImports())
+	// fmt.Printf("NumImports: %v\n", module.NumImports())
+	fns, err := NewWitnessCalcFns(runtime, module)
+	if err != nil {
+		panic(err)
+	}
+	err = foo(runtime, fns)
+	if err != nil {
+		panic(err)
+	}
+}
 
-	// return
+func foo(r *wasm3.Runtime, fns *WitnessCalcFns) error {
+	n32, err := fns.getFrLen()
+	if err != nil {
+		return err
+	}
+	// n32 = (n32 >> 2) - 2
+	log.Print("n32: ", n32)
 
-	// for _, funName := range module.FunctionNames() {
-	// 	fmt.Println(funName)
-	// }
+	pRawPrime, err := fns.getPRawPrime()
+	if err != nil {
+		return err
+	}
+	log.Print("pRawPrime: ", pRawPrime)
 
-	err = module.LinkRawFunction("runtime", "error", "v(iiiiii)", C.m3_wasm3_raw_error)
-	if err != nil {
-		panic(err)
-	}
-	err = module.LinkRawFunction("runtime", "logSetSignal", "v(ii)", C.m3_wasm3_raw_logSetSignal)
-	if err != nil {
-		panic(err)
-	}
-	err = module.LinkRawFunction("runtime", "logGetSignal", "v(ii)", C.m3_wasm3_raw_logGetSignal)
-	if err != nil {
-		panic(err)
-	}
-	err = module.LinkRawFunction("runtime", "logFinishComponent", "v(i)", C.m3_wasm3_raw_logFinishComponent)
-	if err != nil {
-		panic(err)
-	}
-	err = module.LinkRawFunction("runtime", "logStartComponent", "v(i)", C.m3_wasm3_raw_logStartComponent)
-	if err != nil {
-		panic(err)
-	}
-	err = module.LinkRawFunction("runtime", "log", "v(i)", C.m3_wasm3_raw_log)
-	if err != nil {
-		panic(err)
-	}
-
-	fns, err := NewWitnessCalcFns(runtime)
-	if err != nil {
-		panic(err)
-	}
-
-	// fnGetNVars := "getNVars"
-	// fn, err := runtime.FindFunction(fnGetNVars)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// log.Printf("Found '%s' function (using runtime.FindFunction)", fnGetNVars)
-	// result, _ := fn()
-	// log.Print("Result is: ", result)
+	primeBytes := make([]byte, n32)
+	copy(primeBytes, r.Memory()[pRawPrime:pRawPrime+n32])
+	prime := new(big.Int).SetBytes(swap(primeBytes))
+	log.Print("prime: ", prime)
 
 	err = fns.init(1)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
+}
+
+func swap(b []byte) []byte {
+	bs := make([]byte, len(b))
+	for i := 0; i < len(b); i++ {
+		bs[len(b)-1-i] = b[i]
+	}
+	return bs
 }
